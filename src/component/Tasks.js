@@ -50,6 +50,7 @@ const Tasks = () => {
     const [editingTask, setEditingTask] = useState(null); 
     const [searchTask, setSearchTask] = useState("");
     const [selectedTab, setSelectedTab] = useState("all");
+    const [errorMessage, setErrorMessage] = useState(null);
 
     const filteredTask = taskList
         .filter(task => 
@@ -59,55 +60,70 @@ const Tasks = () => {
                 return true;
             }
             return task.completed === (selectedTab === 'completed');
-        })
+    })
     
-    // Add task in firebase
     const addTask = async (e) => {
-        e.preventDefault();
-        if (!newTask.trim()) return;
-        await addDoc(collection(db, 'todos'), {
-            text: newTask,
-            completed: false,
-        });
-        setNewTask("");
-    };
+    e.preventDefault();
+    if (!newTask.trim()) return;
+    try {
+      await addDoc(collection(db, 'todos'), {
+        text: newTask,
+        completed: false,
+      });
+      setNewTask("");
+    } catch (error) {
+      setErrorMessage("Failed to add task. ");
+    }
+  };
 
     // Read the task in firebase
     useEffect(() => {
         const q = query(collection(db, 'todos'));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            let todosArr = [];
-            querySnapshot.forEach(doc => {
-                todosArr.push({...doc.data(), id: doc.id})
-            })
-            setTaskList(todosArr);
+          let todosArr = [];
+          querySnapshot.forEach(doc => {
+            todosArr.push({...doc.data(), id: doc.id})
+          })
+          setTaskList(todosArr);
         });
         return () => unsubscribe()
-    }, []);
+      }, []);
 
     // Complete the task
     const toggleTask = async (task) => {
-        await updateDoc(doc(db, 'todos', task.id), {
+        try {
+          await updateDoc(doc(db, 'todos', task.id), {
             completed: !task.completed
-        });
-    };
+          });
+        } catch (error) {
+          setErrorMessage("Failed to toggle task. ");
+        }
+      };
 
     const deleteTask = async (id) => {
-        await deleteDoc(doc(db, 'todos', id));
+        try {
+          await deleteDoc(doc(db, 'todos', id));
+        } catch (error) {
+          setErrorMessage("Failed to delete task. ");
+        }
     };
 
     const editTask = async (e) => {
         e.preventDefault();
         if (!editingTask || !editingTask.text.trim()) return;
-        await updateDoc(doc(db, "todos", editingTask.id), {
-          text: editingTask.text,
-        });
-        setTaskList(
-          taskList.map((task) =>
-            task.id === editingTask.id ? { ...task, text: editingTask.text } : task
-          )
-        );
-        setEditingTask(null);
+        try {
+          await updateDoc(doc(db, "todos", editingTask.id), {
+            text: editingTask.text,
+          });
+          setTaskList(
+            taskList.map((task) =>
+              task.id === editingTask.id ? { ...task, text: editingTask.text } : task
+            )
+          );
+          setEditingTask(null);
+        } catch (error) {
+          setErrorMessage("Failed to edit task. Please try again later.");
+        }
     };
 
     const handleEditChange = e => {
@@ -212,6 +228,12 @@ const Tasks = () => {
                     onClick={() => setSelectedTab('completed')}>Completed</Button>
             </Box>    
             
+            {errorMessage && (
+            <Typography variant="h6" color="error" sx={{ my: 1, mx: 'auto' }}>
+                {errorMessage}
+            </Typography>
+            )}
+
             <List>
             {filteredTask.length === 0 ? (
                 <Typography variant="body1" align="center" color='primary' sx={{my: 2, mx: 'auto', }}>
@@ -284,6 +306,7 @@ const Tasks = () => {
                     </ListItem>
                 )))}
                 </List>
+
         </Container>
   )
 }
